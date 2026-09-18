@@ -67,6 +67,13 @@ npm run validate:worker
 
 `npm run validate:worker` validerar samma `wrangler.jsonc` som produktionen använder och substituerar endast ett syntetiskt D1-ID för dry-run.
 
+## Runtime probes
+
+- `GET /health` är en ren liveness-probe och kräver inte att OAuth-secrets eller D1 är korrekt konfigurerade.
+- `GET /ready` är readiness-proben och kräver giltig runtime-konfiguration samt fungerande D1.
+
+`/healthz` används inte.
+
 ## Discovery
 
 När produktionen är uppe exponeras:
