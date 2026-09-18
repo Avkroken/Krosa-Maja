@@ -172,7 +172,7 @@ export default {
           scope: "openid profile email offline_access",
         },
       });
-      return clientCreatedPage(created as Record<string, unknown>);
+      return clientCreatedPage(created);
     }
 
     if (url.pathname === "/") {
