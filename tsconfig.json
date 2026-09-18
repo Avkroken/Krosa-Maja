@@ -20,6 +20,9 @@
   },
   "include": [
     "src/**/*.ts",
-    "test/**/*.ts"
+    "test/**/*.ts",
+    "scripts/deploy.ts",
+    "scripts/validate-worker.ts",
+    "scripts/wrangler-config.ts"
   ]
 }

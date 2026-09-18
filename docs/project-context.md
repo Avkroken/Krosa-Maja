@@ -10,17 +10,14 @@ Krösa-Maja ska vara Avkrokens gemensamma OAuth 2.1/OpenID Connect-provider och 
 - Custom Properties är `ci_stack = node` och `platform = cloudflare`.
 - Organisationsruleseten `main`, `main-node` och `main-cloudflare` gäller repositoryt.
 - Central Node/Cloudflare CI har explicita `Avkroken/Krosa-Maja`-profiler.
-- Cloudflare-profilen validerar repositoryts publika template-konfiguration via `npm run validate:worker`.
-- Produktionsissuer är beslutad till `https://auth.denied.se`.
+- Produktionsissuer är `https://auth.denied.se`.
 - Avkrokens centrala Access-standard är deny-by-default med smala publika protokollundantag.
-- Cloudflare-plugin är inte tillgänglig i den aktuella verktygsmiljön, så live Cloudflare-resurser kan inte skapas eller muteras härifrån.
-- `package-lock.json` är genererad av npm och committad.
-- `migrations/0001-better-auth.sql` är genererad av Better Auth CLI 1.7.5 och committad.
-- Genererade artifacts verifierades bit-för-bit mot CI-artifacten genom Git blob-SHA:
-  - `package-lock.json`: `e4928ae2047dc0deef361650ce0d8bb7a9b1ff96`
-  - `migrations/0001-better-auth.sql`: `64c78e875304bcdb8cc256444622aea2a4048774`
-- Bootstrap-körningen passerade 9 tester, TypeScript och Worker dry-run.
-- Den tillfälliga bootstrap-workflowen raderade sig själv efter att de genererade filerna hade committats.
+- `package-lock.json` och Better Auth 1.7.5-migrationen är genererade och versionsstyrda.
+- Cloudflare Workers Builds är kopplat till repositoryt.
+- En första production build 2026-09-18 misslyckades eftersom repositoryt saknade en faktisk Wrangler-konfiguration; Wrangler gick därför in i autoconfig och försökte hitta statiska assets.
+- Fixen gör `wrangler.jsonc` till deploybar source of truth och tar bort `wrangler.template.jsonc`.
+- D1-ID hålls borta från Git. Deployscriptet hittar/skapar `krosa-maja-auth`, verifierar ID:t, applicerar migrationer och deployar med en temporär config.
+- `keep_vars=true` används för att bevara dashboard-konfigurerade plaintext-vars. Wrangler-deploy raderar inte befintliga Worker secrets.
 
 ## Vald implementation
 
@@ -32,13 +29,11 @@ Krösa-Maja ska vara Avkrokens gemensamma OAuth 2.1/OpenID Connect-provider och 
 - Cloudflare som explicit länkad provider, inte alternativ signup-provider
 - Authorization Code + PKCE för downstream-klienter
 - Dynamic Client Registration och Client Credentials avstängda
+- explicit D1 provisioning/migration gate före Worker deployment
 
-## Kvar före deployment
+## Kvar efter deployfixen
 
-- D1-databasen `krosa-maja-auth` ska skapas och dess ID verifieras.
-- Den genererade Better Auth-migrationen ska appliceras på D1 och verifieras.
-- Faktisk `wrangler.jsonc` ska skapas från verifierad Cloudflare-state utan att operativa ID:n läggs i publik dokumentation.
-- Worker secrets och runtime-variabler ska provisioneras.
-- Cloudflare OAuth client ska skapas för den delegerade API-länkningen.
+- Worker secrets och nödvändiga runtime-vars ska verifieras/provisioneras.
 - GitHub OAuth App ska få Krösa-Majas callback utan att befintliga klientcallbacks tas bort för tidigt.
+- Cloudflare OAuth client ska skapas för delegerad API-länkning.
 - OIDC discovery/JWKS och ett fullständigt Authorization Code + PKCE-flöde ska smoke-testas före SSO-cutover.
