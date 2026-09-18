@@ -41,5 +41,5 @@ export function createProtocolPlugins(
       clientRegistrationRequirePKCE: true,
       ...(clientPrivileges ? { clientPrivileges } : {}),
     }),
-  ];
+  ] as const;
 }

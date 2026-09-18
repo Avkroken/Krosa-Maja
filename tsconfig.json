@@ -1,7 +1,10 @@
 {
   "compilerOptions": {
     "allowImportingTsExtensions": true,
-    "lib": ["ES2022", "WebWorker"],
+    "lib": [
+      "ES2022",
+      "WebWorker"
+    ],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "noEmit": true,
@@ -10,7 +13,13 @@
     "skipLibCheck": true,
     "strict": true,
     "target": "ES2022",
-    "types": ["@cloudflare/workers-types"]
+    "types": [
+      "@cloudflare/workers-types",
+      "node"
+    ]
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts"
+  ]
 }

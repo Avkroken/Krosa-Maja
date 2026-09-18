@@ -1,10 +1,4 @@
-export interface GitHubProfile {
-  id: number | string;
-  login?: string;
-  name?: string | null;
-  email?: string | null;
-  avatar_url?: string | null;
-}
+import type { GithubProfile } from "better-auth/social-providers";
 
 interface GitHubEmail {
   email: string;
@@ -19,7 +13,7 @@ export interface BetterAuthGitHubUserInfo {
     image?: string;
     emailVerified: boolean;
   };
-  data: GitHubProfile;
+  data: GithubProfile;
 }
 
 const GITHUB_API_VERSION = "2026-03-10";
@@ -53,7 +47,7 @@ export async function getAllowedGitHubUserInfo(
   ]);
   if (!profileResponse.ok || !emailsResponse.ok) return null;
 
-  const profile = (await profileResponse.json()) as GitHubProfile;
+  const profile = (await profileResponse.json()) as GithubProfile;
   const userId = String(profile.id ?? "");
   if (!allowedGitHubIds.has(userId)) return null;
 

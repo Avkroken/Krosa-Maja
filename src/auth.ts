@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { ACCOUNT_OPTIONS, createProtocolPlugins, RATE_LIMIT_OPTIONS } from "./auth-shared.ts";
-import { scrubRootIdentityTokens, type AccountLike } from "./account-policy.ts";
+import { scrubRootIdentityTokens } from "./account-policy.ts";
 import { readRuntimeConfig } from "./config.ts";
 import type { Env } from "./env.ts";
 import { getAllowedGitHubUserInfo } from "./github.ts";
@@ -55,10 +55,10 @@ export function createAuth(env: Env) {
     databaseHooks: {
       account: {
         create: {
-          before: async (account: AccountLike) => ({ data: scrubRootIdentityTokens(account) }),
+          before: async (account) => ({ data: scrubRootIdentityTokens(account) }),
         },
         update: {
-          before: async (account: AccountLike) => ({ data: scrubRootIdentityTokens(account) }),
+          before: async (account) => ({ data: scrubRootIdentityTokens(account) }),
         },
       },
     },

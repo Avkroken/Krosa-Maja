@@ -1,5 +1,5 @@
 export interface AccountLike {
-  providerId?: string | null;
+  providerId?: string;
   accessToken?: string | null;
   refreshToken?: string | null;
   idToken?: string | null;
