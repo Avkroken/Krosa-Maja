@@ -55,7 +55,7 @@ export function adminPage(model: AdminViewModel): Response {
   );
 }
 
-export function clientCreatedPage(client: Record<string, unknown>): Response {
+export function clientCreatedPage(client: { client_id?: unknown; client_secret?: unknown }): Response {
   const clientId = String(client.client_id ?? "");
   const clientSecret = typeof client.client_secret === "string" ? client.client_secret : null;
   return shell(
