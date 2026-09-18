@@ -8,11 +8,11 @@
   },
   "scripts": {
     "check": "npm test && npm run typecheck && npm run validate:worker",
-    "deploy": "wrangler deploy",
+    "deploy": "node --experimental-strip-types scripts/deploy.ts",
     "generate:auth-schema": "npx auth@1.7.5 generate --config ./scripts/auth-cli.ts --output ./migrations/0001-better-auth.sql --yes",
     "test": "node --experimental-strip-types --test test/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "validate:worker": "wrangler deploy --dry-run --config wrangler.template.jsonc"
+    "validate:worker": "node --experimental-strip-types scripts/validate-worker.ts"
   },
   "dependencies": {
     "@better-auth/oauth-provider": "1.7.5",

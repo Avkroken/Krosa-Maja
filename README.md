@@ -29,7 +29,7 @@ Krösa-Maja är en separat säkerhetskomponent. Den ska inte bäddas in i Skvall
 - Cloudflare OAuth-token krypteras före D1-persistens (`encryptOAuthTokens: true`).
 - Administrationsåtgärder kräver både en giltig Krösa-Maja-session och ett GitHub-konto vars numeric ID finns i admin-allowlisten.
 - OAuth/OIDC-klienter skapas via en server-side adminoperation. Dynamic registration är inte exponerad.
-- `workers.dev` och preview-URL:er ska vara avstängda.
+- `workers.dev` och preview-URL:er är avstängda.
 - Auth-hostens protokollendpoints måste vara publikt routbara, men övriga Avkroken-ytor förblir deny-by-default enligt central Access-standard.
 
 ## Konfiguration
@@ -52,7 +52,9 @@ Icke-hemliga variabler:
 
 D1-binding: `AUTH_DB`.
 
-`wrangler.template.jsonc` är avsiktligt inte deploybar. Den ersätts av `wrangler.jsonc` först när host och D1-ID är verifierade i Cloudflare live-state.
+`wrangler.jsonc` är den deploybara source-of-truth-konfigurationen. Den deklarerar D1 utan ett konto-specifikt `database_id`. `npm run deploy` hittar eller skapar `krosa-maja-auth`, renderar ett temporärt Wrangler-config med det verkliga ID:t, applicerar D1-migrationer och deployar därefter Worker-versionen. Den temporära filen ligger i `.gitignore` och raderas alltid efter körningen.
+
+Dashboard-konfigurerade vanliga variabler bevaras med `keep_vars: true`; Workers-secrets raderas inte av Wrangler-deploy.
 
 ## Lokal verifiering
 
@@ -63,7 +65,7 @@ npm run typecheck
 npm run validate:worker
 ```
 
-`package-lock.json` ska genereras av `npm install` och committas. Det ska inte handskrivas.
+`npm run validate:worker` validerar samma `wrangler.jsonc` som produktionen använder och substituerar endast ett syntetiskt D1-ID för dry-run.
 
 ## Discovery
 
@@ -74,4 +76,4 @@ När produktionen är uppe exponeras:
 
 Övriga protokollendpoints annonseras därifrån och ligger under `/api/auth`.
 
-Se `docs/architecture.md` och `docs/deployment.md` före deployment eller klientmigrering.
+Se `docs/architecture.md` och `docs/deployment.md` före klientmigrering.
