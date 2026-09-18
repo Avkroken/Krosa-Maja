@@ -6,7 +6,7 @@ on:
       - chatgpt/oauth-provider/2026-09-18/17-01-km01
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   generate:
@@ -14,8 +14,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -28,16 +26,6 @@ jobs:
       - name: Generate Better Auth schema
         run: npm run generate:auth-schema
 
-      - name: Upload generated files
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: krosa-maja-generated
-          path: |
-            package-lock.json
-            migrations/0001-better-auth.sql
-          if-no-files-found: error
-          retention-days: 1
-
       - name: Run tests
         run: npm test
 
@@ -46,3 +34,14 @@ jobs:
 
       - name: Validate Worker bundle
         run: npm run validate:worker
+
+      - name: Commit exact generated artifacts and remove bootstrap workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json migrations/0001-better-auth.sql
+          git rm .github/workflows/bootstrap-generated.yml
+          git commit -m "build: add generated lockfile and auth schema"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
