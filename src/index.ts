@@ -30,6 +30,13 @@ function redirect(location: string): Response {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+
+    if (url.pathname === "/health") {
+      if (request.method !== "GET") return methodNotAllowed("GET");
+      return jsonResponse({ ok: true, service: "krosa-maja", protocol: "oauth2.1-oidc" });
+    }
+
     let config;
     try {
       config = readRuntimeConfig(env);
@@ -44,13 +51,8 @@ export default {
       return jsonResponse({ error: "misdirected request" }, 421);
     }
 
-    const auth = createAuth(env);
-    const url = new URL(request.url);
-
-    if (url.pathname === "/healthz") {
-      return jsonResponse({ ok: true, service: "krosa-maja", protocol: "oauth2.1-oidc" });
-    }
     if (url.pathname === "/ready") {
+      if (request.method !== "GET") return methodNotAllowed("GET");
       try {
         await env.AUTH_DB.prepare("SELECT 1 AS ok").first();
         return jsonResponse({ ok: true });
@@ -58,6 +60,8 @@ export default {
         return jsonResponse({ ok: false, error: "database unavailable" }, 503);
       }
     }
+
+    const auth = createAuth(env);
 
     if (url.pathname === "/.well-known/openid-configuration") {
       if (request.method !== "GET") return methodNotAllowed("GET");
