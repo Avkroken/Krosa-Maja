@@ -1,0 +1,38 @@
+name: Edge diagnostic
+
+on:
+  push:
+    branches:
+      - chatgpt/edge-diagnostic/2026-09-19/07-28-km05
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Probe Cloudflare challenge behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          probe() {
+            label="$1"
+            ua="$2"
+            echo "=== $label ==="
+            curl -sS -o "/tmp/$label.body" -D "/tmp/$label.headers" \
+              --max-time 20 \
+              -H "User-Agent: $ua" \
+              -H "Accept: application/json" \
+              https://auth.denied.se/health || true
+            status="$(awk 'toupper($1) ~ /^HTTP\// {code=$2} END {print code}' "/tmp/$label.headers")"
+            echo "status=$status"
+            grep -Ei '^(server|cf-ray|cf-mitigated|content-type|location):' "/tmp/$label.headers" || true
+            head -c 120 "/tmp/$label.body" | tr '\n' ' '
+            echo
+          }
+          probe machine 'krosa-maja-production-smoke/1'
+          probe curl 'curl/8.5.0'
+          probe browser 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36'
+          probe github 'Mozilla/5.0 (compatible; GitHub-Actions-Healthcheck/1.0)'
