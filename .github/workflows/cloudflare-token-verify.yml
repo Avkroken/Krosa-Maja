@@ -16,96 +16,92 @@ jobs:
       CF_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
       CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     steps:
-      - name: Verify Cloudflare token and zone access
+      - name: Correlate Cloudflare health challenge
         shell: bash
         run: |
           set -euo pipefail
           test -n "${CF_ACCOUNT_ID:-}" || { echo "::error::CLOUDFLARE_ACCOUNT_ID missing"; exit 1; }
           test -n "${CF_TOKEN:-}" || { echo "::error::CLOUDFLARE_API_TOKEN missing"; exit 1; }
 
-          verify="$(curl -sS --max-time 20 -H "Authorization: Bearer $CF_TOKEN" https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/tokens/verify)"
+          verify="$(curl -sS --max-time 20 -H "Authorization: Bearer $CF_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/tokens/verify")"
           VERIFY_JSON="$verify" node -e 'const x=JSON.parse(process.env.VERIFY_JSON); console.log("token_verify_success="+!!x.success); if(!x.success) process.exit(1)'
 
           zones="$(curl -sS --max-time 20 -H "Authorization: Bearer $CF_TOKEN" "https://api.cloudflare.com/client/v4/zones?name=denied.se&status=active&per_page=1")"
-          ZONES_JSON="$zones" node -e 'const fs=require("fs"); const x=JSON.parse(process.env.ZONES_JSON); console.log("zone_lookup_success="+!!x.success); console.log("zone_lookup_count="+(Array.isArray(x.result)?x.result.length:0)); if(!x.success || x.result.length!==1) process.exit(1); fs.writeFileSync("/tmp/zone-id",x.result[0].id)'
+          ZONES_JSON="$zones" node -e 'const fs=require("fs"); const x=JSON.parse(process.env.ZONES_JSON); if(!x.success || !Array.isArray(x.result) || x.result.length!==1) process.exit(1); fs.writeFileSync("/tmp/zone-id",x.result[0].id); console.log("zone_lookup_success=true")'
           ZONE_ID="$(cat /tmp/zone-id)"
 
-          echo "=== custom_waf ==="
-          waf="$(curl -sS --max-time 20 -H "Authorization: Bearer $CF_TOKEN" "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/rulesets/phases/http_request_firewall_custom/entrypoint")"
-          WAF_JSON="$waf" node - <<'NODE'
-          const x=JSON.parse(process.env.WAF_JSON);
-          console.log("waf_read_success="+!!x.success);
-          if (x.success) {
-            const rules=(x.result?.rules||[]).map(r=>({
-              id:r.id,description:r.description,action:r.action,
-              expression:r.expression,enabled:r.enabled!==false,
-              action_parameters:r.action_parameters
-            }));
-            console.log(JSON.stringify(rules,null,2));
-          } else {
-            console.log("waf_errors="+JSON.stringify(x.errors||[]));
-          }
+          echo "=== relevant zone settings ==="
+          for setting in browser_check security_level; do
+            result="$(curl -sS --max-time 20 -H "Authorization: Bearer $CF_TOKEN" "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/settings/$setting")"
+            SETTING_JSON="$result" SETTING_NAME="$setting" node - <<'NODE'
+          const x=JSON.parse(process.env.SETTING_JSON);
+          console.log(process.env.SETTING_NAME+"_read_success="+!!x.success);
+          if (x.success) console.log(process.env.SETTING_NAME+"="+String(x.result?.value));
+          else console.log(process.env.SETTING_NAME+"_errors="+JSON.stringify(x.errors||[]));
           NODE
+          done
 
-          echo "=== bot_management ==="
-          bot="$(curl -sS --max-time 20 -H "Authorization: Bearer $CF_TOKEN" "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/bot_management")"
-          BOT_JSON="$bot" node - <<'NODE'
-          const x=JSON.parse(process.env.BOT_JSON);
-          console.log("bot_read_success="+!!x.success);
-          if (x.success) {
-            const r=x.result||{};
-            const keys=["fight_mode","sbfm_definitely_automated","sbfm_likely_automated","sbfm_verified_bots","sbfm_static_resource_protection","enable_js","using_latest_model"];
-            const safe={}; for(const k of keys) if(k in r) safe[k]=r[k];
-            console.log(JSON.stringify(safe,null,2));
-          } else {
-            console.log("bot_errors="+JSON.stringify(x.errors||[]));
-          }
-          NODE
-
-          echo "=== health_challenge ==="
+          echo "=== trigger fresh /health challenge ==="
           curl -sS --max-time 20 -o /tmp/health.body -D /tmp/health.headers \
-            -H "User-Agent: krosa-maja-cloudflare-diagnostic/1" \
+            -H "User-Agent: krosa-maja-cloudflare-diagnostic/2" \
+            -H "Accept: application/json" \
             https://auth.denied.se/health || true
           STATUS="$(grep -Ei '^HTTP/' /tmp/health.headers | tail -1 | cut -d' ' -f2 | tr -d '\r')"
-          RAY="$(awk 'BEGIN{IGNORECASE=1} /^cf-ray:/ {gsub("\\r","",$2); print $2}' /tmp/health.headers | tail -1)"
-          MITIGATED="$(awk 'BEGIN{IGNORECASE=1} /^cf-mitigated:/ {gsub("\\r","",$2); print $2}' /tmp/health.headers | tail -1)"
+          RAY="$(awk 'BEGIN{IGNORECASE=1} /^cf-ray:/ {gsub("\r","",$2); print $2}' /tmp/health.headers | tail -1)"
+          MITIGATED="$(awk 'BEGIN{IGNORECASE=1} /^cf-mitigated:/ {gsub("\r","",$2); print $2}' /tmp/health.headers | tail -1)"
           echo "health_status=$STATUS"
           echo "health_cf_mitigated=${MITIGATED:-none}"
           echo "health_ray_present=$([ -n "${RAY:-}" ] && echo true || echo false)"
-
           sleep 5
-          FROM="$(date -u -d '15 minutes ago' +%Y-%m-%dT%H:%M:%SZ)"
+
+          echo "=== introspect firewall filter fields ==="
+          schema_payload='{"query":"{__type(name:\"ZoneFirewallEventsAdaptiveFilter_InputObject\"){inputFields{name}}}"}'
+          schema="$(curl -sS --max-time 30 -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" --data "$schema_payload" https://api.cloudflare.com/client/v4/graphql)"
+          SCHEMA_JSON="$schema" node - <<'NODE'
+          const x=JSON.parse(process.env.SCHEMA_JSON);
+          const names=(x.data?.__type?.inputFields||[]).map(x=>x.name).filter(n=>
+            /path|host|ray|datetime/i.test(n)
+          );
+          console.log("relevant_filter_fields="+JSON.stringify(names));
+          NODE
+
+          FROM="$(date -u -d '5 minutes ago' +%Y-%m-%dT%H:%M:%SZ)"
           TO="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          echo "=== server-side filtered Security Events ==="
           payload="$(ZONE_ID="$ZONE_ID" FROM="$FROM" TO="$TO" node - <<'NODE'
           const payload={
             query:`query ListFirewallEvents($zoneTag: string, $filter: FirewallEventsAdaptiveFilter_InputObject) {
               viewer {
                 zones(filter: { zoneTag: $zoneTag }) {
-                  firewallEventsAdaptive(filter: $filter, limit: 100, orderBy: [datetime_DESC]) {
+                  firewallEventsAdaptive(filter: $filter, limit: 50, orderBy: [datetime_DESC]) {
                     action
+                    clientRequestHTTPHost
                     clientRequestPath
                     datetime
                     source
                     ruleId
                     description
                     rayName
+                    userAgent
                   }
                 }
               }
             }`,
             variables:{
               zoneTag:process.env.ZONE_ID,
-              filter:{datetime_geq:process.env.FROM,datetime_leq:process.env.TO}
+              filter:{
+                datetime_geq:process.env.FROM,
+                datetime_leq:process.env.TO,
+                clientRequestHTTPHost:"auth.denied.se",
+                clientRequestPath:"/health"
+              }
             }
           };
           process.stdout.write(JSON.stringify(payload));
           NODE
           )"
-          events="$(curl -sS --max-time 30 \
-            -H "Authorization: Bearer $CF_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data "$payload" \
-            https://api.cloudflare.com/client/v4/graphql)"
+          events="$(curl -sS --max-time 30 -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" --data "$payload" https://api.cloudflare.com/client/v4/graphql)"
           EVENTS_JSON="$events" RAY="$RAY" node - <<'NODE'
           const x=JSON.parse(process.env.EVENTS_JSON);
           if (x.errors?.length) {
@@ -115,14 +111,18 @@ jobs:
           }
           console.log("security_events_query_success=true");
           const all=x.data?.viewer?.zones?.[0]?.firewallEventsAdaptive||[];
+          console.log("filtered_health_events="+all.length);
           const ray=(process.env.RAY||"").split("-")[0].toLowerCase();
-          const matches=all.filter(e =>
-            e.clientRequestPath==="/health" &&
-            (!ray || String(e.rayName||"").toLowerCase().startsWith(ray))
-          ).map(e=>({
-            action:e.action,path:e.clientRequestPath,datetime:e.datetime,
-            source:e.source,ruleId:e.ruleId,description:e.description
+          const safe=all.map(e=>({
+            action:e.action,
+            host:e.clientRequestHTTPHost,
+            path:e.clientRequestPath,
+            datetime:e.datetime,
+            source:e.source,
+            ruleId:e.ruleId,
+            description:e.description,
+            rayMatch: ray ? String(e.rayName||"").toLowerCase().startsWith(ray) : false,
+            userAgent:e.userAgent
           }));
-          console.log("matching_health_events="+matches.length);
-          console.log(JSON.stringify(matches.slice(0,10),null,2));
+          console.log(JSON.stringify(safe,null,2));
           NODE
