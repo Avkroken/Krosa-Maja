@@ -66,7 +66,7 @@ jobs:
           curl -sS --max-time 20 -o /tmp/health.body -D /tmp/health.headers \
             -H "User-Agent: krosa-maja-cloudflare-diagnostic/1" \
             https://auth.denied.se/health || true
-          STATUS="$(awk 'toupper($1) ~ /^HTTP\\// {code=$2} END {print code}' /tmp/health.headers)"
+          STATUS="$(grep -Ei '^HTTP/' /tmp/health.headers | tail -1 | cut -d' ' -f2 | tr -d '\r')"
           RAY="$(awk 'BEGIN{IGNORECASE=1} /^cf-ray:/ {gsub("\\r","",$2); print $2}' /tmp/health.headers | tail -1)"
           MITIGATED="$(awk 'BEGIN{IGNORECASE=1} /^cf-mitigated:/ {gsub("\\r","",$2); print $2}' /tmp/health.headers | tail -1)"
           echo "health_status=$STATUS"
