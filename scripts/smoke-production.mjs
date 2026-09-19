@@ -32,9 +32,11 @@ function challengeResponse(response) {
   return response.headers.get("cf-mitigated") === "challenge";
 }
 
+class CloudflareChallengeError extends Error {}
+
 function challengeError(path, response) {
   const ray = response.headers.get("cf-ray") ?? "<none>";
-  return new Error(
+  return new CloudflareChallengeError(
     `${path} was intercepted by a Cloudflare Challenge Page before the Worker/Access boundary (HTTP ${response.status}, cf-ray=${ray}). Public OAuth/OIDC protocol paths must not return cf-mitigated=challenge.`,
   );
 }
@@ -81,6 +83,7 @@ async function waitForHealth() {
         );
       }
     } catch (error) {
+      if (error instanceof CloudflareChallengeError) throw error;
       lastError = error;
     }
 
