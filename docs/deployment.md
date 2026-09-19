@@ -88,12 +88,11 @@ Lagra client secret som Worker secret.
 
 ## 7. Cloudflare edge och publika protokollvägar
 
-Cloudflare Access-bypass är inte ensam tillräcklig för OAuth/OIDC. En tidigare edge-fas får inte svara med en Cloudflare Challenge Page på publika protokollvägar, eftersom maskinklienter inte kan lösa en interaktiv HTML-challenge.
+Cloudflare Access- och edge-skydd ska vara kompatibla med de OAuth/OIDC-vägar som enligt protokollet måste kunna nås av klienter. CI/CD får däremot inte kräva att GitHub-hostade runners kan passera Cloudflares bot- eller challenge-lager bara för att bekräfta att en deployment lever.
 
-Följande vägar ska vara publikt routbara och får inte returnera `cf-mitigated: challenge`:
+Följande protokollvägar är avsedda att vara publikt routbara:
 
 ```text
-/health
 /.well-known/*
 /sign-in*
 /consent*
@@ -102,11 +101,11 @@ Följande vägar ska vara publikt routbara och får inte returnera `cf-mitigated
 /api/auth/jwks
 ```
 
-`/ready`, `/admin` och `/admin/*` ska fortsatt ligga bakom Access/default-deny.
+`/admin` och `/admin/*` ska fortsatt ligga bakom Access/default-deny.
 
-Om en publik protokollväg träffas av en Challenge Page ska Cloudflare Security Events användas för att identifiera vilken edge-produkt som utförde åtgärden innan policyn ändras. Ett eventuellt undantag ska vara path-scopat till listan ovan; zonens skydd ska inte stängas av generellt.
+Ändringar av Cloudflare security policy, bot-skydd eller permissions görs inte som en bieffekt av CI-verifiering. Sådana ändringar kräver separat analys och uttryckligt godkännande.
 
-Production-smoke verifierar detta explicit och failar direkt om response-headern `cf-mitigated` är `challenge`.
+Deployment-status tas från Cloudflare Workers Builds/Git-integrationen och dess status tillbaka till GitHub. Någon GitHub-origin production-smoke som pingar Worker-endpoints används inte.
 
 ## 8. OIDC smoke test
 
