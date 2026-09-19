@@ -27,4 +27,37 @@ jobs:
           VERIFY_JSON="$verify" node -e 'const x=JSON.parse(process.env.VERIFY_JSON); console.log("token_verify_success="+!!x.success); if(!x.success) process.exit(1)'
 
           zones="$(curl -sS --max-time 20 -H "Authorization: Bearer $CF_TOKEN" "https://api.cloudflare.com/client/v4/zones?name=denied.se&status=active&per_page=1")"
-          ZONES_JSON="$zones" node -e 'const x=JSON.parse(process.env.ZONES_JSON); console.log("zone_lookup_success="+!!x.success); console.log("zone_lookup_count="+(Array.isArray(x.result)?x.result.length:0)); if(!x.success || x.result.length!==1) process.exit(1)'
+          ZONES_JSON="$zones" node -e 'const fs=require("fs"); const x=JSON.parse(process.env.ZONES_JSON); console.log("zone_lookup_success="+!!x.success); console.log("zone_lookup_count="+(Array.isArray(x.result)?x.result.length:0)); if(!x.success || x.result.length!==1) process.exit(1); fs.writeFileSync("/tmp/zone-id",x.result[0].id)'
+          ZONE_ID="$(cat /tmp/zone-id)"
+
+          echo "=== custom_waf ==="
+          waf="$(curl -sS --max-time 20 -H "Authorization: Bearer $CF_TOKEN" "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/rulesets/phases/http_request_firewall_custom/entrypoint")"
+          WAF_JSON="$waf" node - <<'NODE'
+          const x=JSON.parse(process.env.WAF_JSON);
+          console.log("waf_read_success="+!!x.success);
+          if (x.success) {
+            const rules=(x.result?.rules||[]).map(r=>({
+              id:r.id,description:r.description,action:r.action,
+              expression:r.expression,enabled:r.enabled!==false,
+              action_parameters:r.action_parameters
+            }));
+            console.log(JSON.stringify(rules,null,2));
+          } else {
+            console.log("waf_errors="+JSON.stringify(x.errors||[]));
+          }
+          NODE
+
+          echo "=== bot_management ==="
+          bot="$(curl -sS --max-time 20 -H "Authorization: Bearer $CF_TOKEN" "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/bot_management")"
+          BOT_JSON="$bot" node - <<'NODE'
+          const x=JSON.parse(process.env.BOT_JSON);
+          console.log("bot_read_success="+!!x.success);
+          if (x.success) {
+            const r=x.result||{};
+            const keys=["fight_mode","sbfm_definitely_automated","sbfm_likely_automated","sbfm_verified_bots","sbfm_static_resource_protection","enable_js","using_latest_model"];
+            const safe={}; for(const k of keys) if(k in r) safe[k]=r[k];
+            console.log(JSON.stringify(safe,null,2));
+          } else {
+            console.log("bot_errors="+JSON.stringify(x.errors||[]));
+          }
+          NODE
