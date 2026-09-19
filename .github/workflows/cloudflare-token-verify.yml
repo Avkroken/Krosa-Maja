@@ -1,23 +1,13 @@
 name: Cloudflare token verify
 
 on:
-  push:
-    branches:
-      - chatgpt/cloudflare-token-verify/2026-09-19/08-12-km10
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  apply:
+  retired:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
     steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-      - name: Disable incompatible Bot Fight Mode and verify
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: node scripts/temp-disable-bfm.mjs
+      - run: echo "Temporary Cloudflare mutation workflow retired"
