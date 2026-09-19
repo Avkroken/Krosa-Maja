@@ -23,7 +23,7 @@ jobs:
           test -n "${CF_ACCOUNT_ID:-}" || { echo "::error::CLOUDFLARE_ACCOUNT_ID missing"; exit 1; }
           test -n "${CF_TOKEN:-}" || { echo "::error::CLOUDFLARE_API_TOKEN missing"; exit 1; }
 
-          verify="$(curl -sS --max-time 20 -H "Authorization: Bearer $CF_TOKEN" https://api.cloudflare.com/client/v4/user/tokens/verify)"
+          verify="$(curl -sS --max-time 20 -H "Authorization: Bearer $CF_TOKEN" https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/tokens/verify)"
           VERIFY_JSON="$verify" node -e 'const x=JSON.parse(process.env.VERIFY_JSON); console.log("token_verify_success="+!!x.success); if(!x.success) process.exit(1)'
 
           zones="$(curl -sS --max-time 20 -H "Authorization: Bearer $CF_TOKEN" "https://api.cloudflare.com/client/v4/zones?name=denied.se&status=active&per_page=1")"
