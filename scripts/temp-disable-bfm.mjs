@@ -27,17 +27,17 @@ const zoneId = zones[0].id;
 const before = await cf(`/zones/${zoneId}/bot_management`);
 console.log("fight_mode_before=" + String(before.fight_mode));
 
-if (before.fight_mode !== false) {
+if (before.fight_mode !== true) {
   const updated = await cf(`/zones/${zoneId}/bot_management`, {
     method: "PUT",
-    body: JSON.stringify({ fight_mode: false }),
+    body: JSON.stringify({ fight_mode: true }),
   });
   console.log("fight_mode_after_update=" + String(updated.fight_mode));
 }
 
 const after = await cf(`/zones/${zoneId}/bot_management`);
-if (after.fight_mode !== false) throw new Error("Bot Fight Mode remained enabled");
-console.log("fight_mode_verified=false");
+if (after.fight_mode !== true) throw new Error("Bot Fight Mode was not restored");
+console.log("fight_mode_verified=true");
 
 await new Promise((resolve) => setTimeout(resolve, 3000));
 const health = await fetch("https://auth.denied.se/health", {
