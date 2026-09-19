@@ -86,11 +86,33 @@ https://auth.denied.se/api/auth/callback/cloudflare
 
 Lagra client secret som Worker secret.
 
-## 7. OIDC smoke test
+## 7. Cloudflare edge och publika protokollvägar
+
+Cloudflare Access-bypass är inte ensam tillräcklig för OAuth/OIDC. En tidigare edge-fas får inte svara med en Cloudflare Challenge Page på publika protokollvägar, eftersom maskinklienter inte kan lösa en interaktiv HTML-challenge.
+
+Följande vägar ska vara publikt routbara och får inte returnera `cf-mitigated: challenge`:
+
+```text
+/health
+/.well-known/*
+/sign-in*
+/consent*
+/api/auth/oauth2/*
+/api/auth/callback/*
+/api/auth/jwks
+```
+
+`/ready`, `/admin` och `/admin/*` ska fortsatt ligga bakom Access/default-deny.
+
+Om en publik protokollväg träffas av en Challenge Page ska Cloudflare Security Events användas för att identifiera vilken edge-produkt som utförde åtgärden innan policyn ändras. Ett eventuellt undantag ska vara path-scopat till listan ovan; zonens skydd ska inte stängas av generellt.
+
+Production-smoke verifierar detta explicit och failar direkt om response-headern `cf-mitigated` är `challenge`.
+
+## 8. OIDC smoke test
 
 Verifiera discovery och JWKS först. Registrera därefter en testklient genom `/admin` och kör hela Authorization Code + PKCE-flödet. Kontrollera issuer, audience, nonce, state, redirect URI, ID-token-signatur, UserInfo, refresh, revoke och logout.
 
-## 8. Cloudflare Generic OIDC och appmigrering
+## 9. Cloudflare Generic OIDC och appmigrering
 
 När testklienten är verifierad konfigureras Cloudflare Generic OIDC som downstream-klient till Krösa-Maja.
 
