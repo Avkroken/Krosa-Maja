@@ -28,6 +28,17 @@ async function bodyPreview(response) {
   return text.replace(/\s+/g, " ").slice(0, 500);
 }
 
+function challengeResponse(response) {
+  return response.headers.get("cf-mitigated") === "challenge";
+}
+
+function challengeError(path, response) {
+  const ray = response.headers.get("cf-ray") ?? "<none>";
+  return new Error(
+    `${path} was intercepted by a Cloudflare Challenge Page before the Worker/Access boundary (HTTP ${response.status}, cf-ray=${ray}). Public OAuth/OIDC protocol paths must not return cf-mitigated=challenge.`,
+  );
+}
+
 function accessRedirect(response) {
   const location = response.headers.get("location");
   if (!location) return false;
@@ -52,6 +63,7 @@ async function waitForHealth() {
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
       const response = await request("/health");
+      if (challengeResponse(response)) throw challengeError("/health", response);
       if (response.status === 200) {
         const body = await response.json();
         if (
@@ -82,6 +94,7 @@ async function waitForHealth() {
 
 async function expectJson(path, validate) {
   const response = await request(path);
+  if (challengeResponse(response)) throw challengeError(path, response);
   if (response.status !== 200) {
     throw new Error(`${path} returned ${response.status}: ${await bodyPreview(response)}`);
   }
@@ -93,6 +106,7 @@ async function expectJson(path, validate) {
 
 async function expectPublic(path, init = {}) {
   const response = await request(path, init);
+  if (challengeResponse(response)) throw challengeError(path, response);
   if (accessRedirect(response)) {
     throw new Error(`${path} is still intercepted by Cloudflare Access`);
   }
@@ -104,6 +118,7 @@ async function expectPublic(path, init = {}) {
 
 async function expectAccessProtected(path) {
   const response = await request(path);
+  if (challengeResponse(response)) throw challengeError(path, response);
   if (!accessRedirect(response)) {
     throw new Error(
       `${path} is not protected by the expected Cloudflare Access redirect (HTTP ${response.status}, location=${response.headers.get("location") ?? "<none>"}): ${await bodyPreview(response)}`,
