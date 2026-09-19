@@ -32,10 +32,6 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    if (url.pathname === "/health") {
-      if (request.method !== "GET") return methodNotAllowed("GET");
-      return jsonResponse({ ok: true, service: "krosa-maja", protocol: "oauth2.1-oidc" });
-    }
 
     let config;
     try {
@@ -51,15 +47,6 @@ export default {
       return jsonResponse({ error: "misdirected request" }, 421);
     }
 
-    if (url.pathname === "/ready") {
-      if (request.method !== "GET") return methodNotAllowed("GET");
-      try {
-        await env.AUTH_DB.prepare("SELECT 1 AS ok").first();
-        return jsonResponse({ ok: true });
-      } catch {
-        return jsonResponse({ ok: false, error: "database unavailable" }, 503);
-      }
-    }
 
     const auth = createAuth(env);
 
