@@ -48,6 +48,6 @@ Better Auths globala rate limiter är explicit aktiverad och använder D1-lagrin
 
 - felaktig/missing runtime config -> 503
 - fel Host/origin -> 421
-- saknad D1 i readiness -> 503
+- otillgänglig D1 -> stateful auth-operationer failar stängt; ingen separat readiness-endpoint exponeras
 - okänd GitHub-identitet -> ingen lokal session
 - Cloudflare saknar klientkonfiguration -> länkning 503, OIDC-provider fortsätter fungera

@@ -4,7 +4,7 @@
 
 Krösa-Maja ska vara Avkrokens gemensamma OAuth 2.1/OpenID Connect-provider och kunna länka Cloudflare för delegerad API-access.
 
-## Verifierad state 2026-09-18
+## Verifierad state 2026-09-19
 
 - Repositoryt `Avkroken/Krosa-Maja` finns och har default branch `main`.
 - Custom Properties är `ci_stack = node` och `platform = cloudflare`.
@@ -18,6 +18,9 @@ Krösa-Maja ska vara Avkrokens gemensamma OAuth 2.1/OpenID Connect-provider och 
 - Fixen gör `wrangler.jsonc` till deploybar source of truth och tar bort `wrangler.template.jsonc`.
 - D1-ID hålls borta från Git. Deployscriptet hittar/skapar `krosa-maja-auth`, verifierar ID:t, applicerar migrationer och deployar med en temporär config.
 - `keep_vars=true` används för att bevara dashboard-konfigurerade plaintext-vars. Wrangler-deploy raderar inte befintliga Worker secrets.
+- Cloudflare Workers Builds rapporterar deploymentstatus tillbaka till GitHub som `Workers Builds: krosa-maja`.
+- GitHub-origin production-smoke samt `/health` och `/ready` är borttagna; deploystatus verifieras inte genom externa pingar mot produktionen.
+- Cloudflare Bot Fight Mode är fortsatt aktiverat.
 
 ## Vald implementation
 
@@ -31,9 +34,10 @@ Krösa-Maja ska vara Avkrokens gemensamma OAuth 2.1/OpenID Connect-provider och 
 - Dynamic Client Registration och Client Credentials avstängda
 - explicit D1 provisioning/migration gate före Worker deployment
 
-## Kvar efter deployfixen
+## Kvar till produktionsfärdig SSO
 
 - Worker secrets och nödvändiga runtime-vars ska verifieras/provisioneras.
 - GitHub OAuth App ska få Krösa-Majas callback utan att befintliga klientcallbacks tas bort för tidigt.
 - Cloudflare OAuth client ska skapas för delegerad API-länkning.
-- OIDC discovery/JWKS och ett fullständigt Authorization Code + PKCE-flöde ska smoke-testas före SSO-cutover.
+- OIDC discovery/JWKS och ett fullständigt Authorization Code + PKCE-flöde ska verifieras före SSO-cutover. CI-kontraktstester ska vara lokala mot implementationen och får inte kräva externa production-pingar.
+- Cloudflare Generic OIDC ska konfigureras som downstream-klient och därefter migreras en app i taget utan att fungerande identitetsväg tas bort i förtid.
