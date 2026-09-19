@@ -61,3 +61,68 @@ jobs:
             console.log("bot_errors="+JSON.stringify(x.errors||[]));
           }
           NODE
+
+          echo "=== health_challenge ==="
+          curl -sS --max-time 20 -o /tmp/health.body -D /tmp/health.headers \
+            -H "User-Agent: krosa-maja-cloudflare-diagnostic/1" \
+            https://auth.denied.se/health || true
+          STATUS="$(awk 'toupper($1) ~ /^HTTP\\// {code=$2} END {print code}' /tmp/health.headers)"
+          RAY="$(awk 'BEGIN{IGNORECASE=1} /^cf-ray:/ {gsub("\\r","",$2); print $2}' /tmp/health.headers | tail -1)"
+          MITIGATED="$(awk 'BEGIN{IGNORECASE=1} /^cf-mitigated:/ {gsub("\\r","",$2); print $2}' /tmp/health.headers | tail -1)"
+          echo "health_status=$STATUS"
+          echo "health_cf_mitigated=${MITIGATED:-none}"
+          echo "health_ray_present=$([ -n "${RAY:-}" ] && echo true || echo false)"
+
+          sleep 5
+          FROM="$(date -u -d '15 minutes ago' +%Y-%m-%dT%H:%M:%SZ)"
+          TO="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          payload="$(ZONE_ID="$ZONE_ID" FROM="$FROM" TO="$TO" node - <<'NODE'
+          const payload={
+            query:`query ListFirewallEvents($zoneTag: string, $filter: FirewallEventsAdaptiveFilter_InputObject) {
+              viewer {
+                zones(filter: { zoneTag: $zoneTag }) {
+                  firewallEventsAdaptive(filter: $filter, limit: 100, orderBy: [datetime_DESC]) {
+                    action
+                    clientRequestPath
+                    datetime
+                    source
+                    ruleId
+                    description
+                    rayName
+                  }
+                }
+              }
+            }`,
+            variables:{
+              zoneTag:process.env.ZONE_ID,
+              filter:{datetime_geq:process.env.FROM,datetime_leq:process.env.TO}
+            }
+          };
+          process.stdout.write(JSON.stringify(payload));
+          NODE
+          )"
+          events="$(curl -sS --max-time 30 \
+            -H "Authorization: Bearer $CF_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "$payload" \
+            https://api.cloudflare.com/client/v4/graphql)"
+          EVENTS_JSON="$events" RAY="$RAY" node - <<'NODE'
+          const x=JSON.parse(process.env.EVENTS_JSON);
+          if (x.errors?.length) {
+            console.log("security_events_query_success=false");
+            console.log(JSON.stringify(x.errors,null,2));
+            process.exit(0);
+          }
+          console.log("security_events_query_success=true");
+          const all=x.data?.viewer?.zones?.[0]?.firewallEventsAdaptive||[];
+          const ray=(process.env.RAY||"").split("-")[0].toLowerCase();
+          const matches=all.filter(e =>
+            e.clientRequestPath==="/health" &&
+            (!ray || String(e.rayName||"").toLowerCase().startsWith(ray))
+          ).map(e=>({
+            action:e.action,path:e.clientRequestPath,datetime:e.datetime,
+            source:e.source,ruleId:e.ruleId,description:e.description
+          }));
+          console.log("matching_health_events="+matches.length);
+          console.log(JSON.stringify(matches.slice(0,10),null,2));
+          NODE
